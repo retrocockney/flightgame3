@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Plane Shooter Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background: #87CEEB;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const plane = { x: 300, y: 350, width: 40, height: 40, speed: 5, lives: 3 };
+const missiles = [];
+const enemies = [];
+let score = 0;
+let gameOver = false;
+const keys = {};
+
+// Background scroll
+let bgOffset = 0;
+
+// Time tracking for day-night cycle
+let startTime = Date.now();
+
+// Draw functions
+function drawBackground() {
+  // Calculate day-night color (one full cycle per minute)
+  const elapsed = (Date.now() - startTime) / 60000; // minutes
+  const t = elapsed % 1; // 0 → 1 every minute
+  const r = Math.floor(135 * (1 - t) + 25 * t);
+  const g = Math.floor(206 * (1 - t) + 25 * t);
+  const b = Math.floor(235 * (1 - t) + 112 * t);
+  ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw scrolling clouds (simple white rectangles)
+  ctx.fillStyle = 'white';
+  for (let i = 0; i < 10; i++) {
+    const cloudX = (i * 150 + bgOffset) % canvas.width;
+    const cloudY = (i * 30) % 200;
+    ctx.fillRect(cloudX, cloudY, 100, 30);
+  }
+
+  // Update background offset
+  bgOffset -= 1; // scroll speed
+}
+
+// Draw game objects
+function drawPlane() {
+  ctx.fillStyle = 'green';
+  ctx.fillRect(plane.x, plane.y, plane.width, plane.height);
+}
+
+function drawMissiles() {
+  ctx.fillStyle = 'red';
+  missiles.forEach(m => ctx.fillRect(m.x, m.y, m.width, m.height));
+}
+
+function drawEnemies() {
+  ctx.fillStyle = 'black';
+  enemies.forEach(e => ctx.fillRect(e.x, e.y, e.width, e.height));
+}
+
+function drawHUD() {
+  ctx.fillStyle = 'black';
+  ctx.font = '16px Arial';
+  ctx.fillText(`Lives: ${plane.lives}`, 10, 20);
+  ctx.fillText(`Score: ${score}`, 500, 20);
+}
+
+// Enemy spawning
+function spawnEnemy() {
+  const x = Math.random() * (canvas.width - 40);
+  enemies.push({ x: x, y: -40, width: 40, height: 40, speed: 2 });
+}
+
+// Update game objects
+function update() {
+  if (gameOver) return;
+
+  // Plane movement
+  if (keys['ArrowLeft'] && plane.x > 0) plane.x -= plane.speed;
+  if (keys['ArrowRight'] && plane.x < canvas.width - plane.width) plane.x += plane.speed;
+  if (keys['ArrowUp'] && plane.y > 0) plane.y -= plane.speed;
+  if (keys['ArrowDown'] && plane.y < canvas.height - plane.height) plane.y += plane.speed;
+
+  // Move missiles
+  missiles.forEach((m, i) => {
+    m.x += m.vx;
+    m.y += m.vy;
+    if (m.x < -10 || m.x > canvas.width + 10 || m.y < -10 || m.y > canvas.height + 10) {
+      missiles.splice(i, 1);
+    }
+  });
+
+  // Move enemies
+  enemies.forEach((e, i) => {
+    e.y += e.speed;
+
+    // Check collision with plane
+    if (
+      e.x < plane.x + plane.width &&
+      e.x + e.width > plane.x &&
+      e.y < plane.y + plane.height &&
+      e.y + e.height > plane.y
+    ) {
+      plane.lives--;
+      enemies.splice(i, 1);
+      if (plane.lives <= 0) gameOver = true;
+    }
+
+    // Check collision with missiles
+    missiles.forEach((m, mi) => {
+      if (
+        m.x < e.x + e.width &&
+        m.x + m.width > e.x &&
+        m.y < e.y + e.height &&
+        m.y + m.height > e.y
+      ) {
+        enemies.splice(i, 1);
+        missiles.splice(mi, 1);
+        score += 10;
+      }
+    });
+
+    // Remove enemy if off screen
+    if (e.y > canvas.height) enemies.splice(i, 1);
+  });
+}
+
+// Draw everything
+function draw() {
+  drawBackground();
+  drawPlane();
+  drawMissiles();
+  drawEnemies();
+  drawHUD();
+
+  if (gameOver) {
+    ctx.fillStyle = 'red';
+    ctx.font = '40px Arial';
+    ctx.fillText('GAME OVER', 180, 200);
+  }
+}
+
+// Main loop
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// Controls
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+
+  // Shooting in directions
+  if (e.key === 'w') missiles.push({ x: plane.x + 15, y: plane.y, width: 10, height: 20, vx: 0, vy: -7 });
+  if (e.key === 'a') missiles.push({ x: plane.x, y: plane.y + 15, width: 20, height: 10, vx: -7, vy: 0 });
+  if (e.key === 's') missiles.push({ x: plane.x + 15, y: plane.y + 40, width: 10, height: 20, vx: 0, vy: 7 });
+  if (e.key === 'd') missiles.push({ x: plane.x + 40, y: plane.y + 15, width: 20, height: 10, vx: 7, vy: 0 });
+});
+
+document.addEventListener('keyup', e => {
+  keys[e.key] = false;
+});
+
+// Spawn enemies every 1.5s
+setInterval(spawnEnemy, 1500);
+
+// Start game
+gameLoop();
+</script>
+</body>
+</html>
